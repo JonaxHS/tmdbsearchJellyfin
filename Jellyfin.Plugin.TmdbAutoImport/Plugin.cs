@@ -30,6 +30,13 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 Name = "tmdbAutoImportConfig",
                 EmbeddedResourcePath = "Jellyfin.Plugin.TmdbAutoImport.Configuration.configPage.html"
+            },
+            new PluginPageInfo
+            {
+                Name = "tmdbAutoImportSearch",
+                EmbeddedResourcePath = "Jellyfin.Plugin.TmdbAutoImport.Configuration.searchPage.html",
+                EnableInMainMenu = true,
+                MenuSection = "plugins"
             }
         };
     }

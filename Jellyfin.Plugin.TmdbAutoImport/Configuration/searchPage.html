@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>TMDb Auto Import Search</title>
+</head>
+<body>
+    <div id="TmdbAutoImportSearchPage" data-role="page" class="page type-interior pluginConfigurationPage">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="TmdbAutoImportSearchForm">
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SearchQuery">Buscar título</label>
+                        <input id="SearchQuery" name="SearchQuery" type="text" autocomplete="off" placeholder="Ej. The Office" />
+                        <div class="fieldDescription">Si no existe en tu biblioteca, se buscará en TMDb e importará el primer resultado.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SearchType">Tipo</label>
+                        <select id="SearchType" name="SearchType" is="emby-select">
+                            <option value="movie">Película</option>
+                            <option value="series">Serie</option>
+                        </select>
+                    </div>
+
+                    <div class="buttonContainer">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Buscar e importar</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div id="SearchStatus" class="fieldDescription" style="margin-top: 1em;"></div>
+                <div id="SearchResults" style="margin-top: 1em;"></div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var page = document.querySelector('#TmdbAutoImportSearchPage');
+                var form = document.querySelector('#TmdbAutoImportSearchForm');
+                var status = document.querySelector('#SearchStatus');
+                var results = document.querySelector('#SearchResults');
+                var pluginId = '9d4fb3ad-76c7-4eb4-b17a-ec6fbc7ab637';
+
+                function escapeHtml(value) {
+                    return String(value || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                }
+
+                function renderItems(items) {
+                    if (!items || !items.length) {
+                        results.innerHTML = '';
+                        return;
+                    }
+
+                    var html = '<div class="sectionTitleContainer"><h2 class="sectionTitle">Resultados locales</h2></div>';
+                    html += '<div class="paperList">';
+                    items.forEach(function (item) {
+                        html += '<div style="padding: .5em 0; border-bottom: 1px solid rgba(127,127,127,.2);">';
+                        html += '<strong>' + escapeHtml(item.Name) + '</strong>';
+                        if (item.Path) {
+                            html += '<div class="fieldDescription">' + escapeHtml(item.Path) + '</div>';
+                        }
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                    results.innerHTML = html;
+                }
+
+                function onSubmit(e) {
+                    e.preventDefault();
+
+                    var query = document.querySelector('#SearchQuery').value.trim();
+                    var type = document.querySelector('#SearchType').value;
+
+                    if (!query) {
+                        status.textContent = 'Escribe un título primero.';
+                        results.innerHTML = '';
+                        return false;
+                    }
+
+                    status.textContent = 'Buscando...';
+                    results.innerHTML = '';
+                    Dashboard.showLoadingMsg();
+
+                    var url = ApiClient.getUrl('Plugins/TmdbAutoImport/search-or-import', {
+                        query: query,
+                        type: type
+                    });
+
+                    ApiClient.getJSON(url).then(function (response) {
+                        status.textContent = response.Message || '';
+                        if (response.Items && response.Items.length) {
+                            renderItems(response.Items);
+                        } else if (response.Source === 'tmdb' && response.TmdbTitle) {
+                            results.innerHTML = '<div class="alert alert-success">Importado: <strong>' + escapeHtml(response.TmdbTitle) + '</strong></div>';
+                        } else {
+                            results.innerHTML = '';
+                        }
+                    }).catch(function (error) {
+                        status.textContent = 'Error al buscar o importar.';
+                        results.innerHTML = '<div class="alert alert-error">' + escapeHtml(error) + '</div>';
+                    }).finally(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+
+                    return false;
+                }
+
+                page.addEventListener('pageshow', function () {
+                    status.textContent = 'Usa este buscador para consultar la biblioteca local y, si no existe, importar desde TMDb.';
+                });
+
+                form.addEventListener('submit', onSubmit);
+            })();
+        </script>
+    </div>
+</body>
+</html>

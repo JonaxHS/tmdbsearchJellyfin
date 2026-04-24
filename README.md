@@ -10,7 +10,9 @@ Plugin de Jellyfin que implementa un flujo de:
 
 MVP funcional a nivel de plugin backend/API.
 
-- No intercepta automaticamente la barra de busqueda nativa del cliente web de Jellyfin.
+- Intercepta la busqueda nativa de Jellyfin (`/Items`) para peliculas/series cuando no hay coincidencias locales.
+- Aplica cache corta de resultados para evitar reimportaciones repetidas en cada pulsacion.
+- Incluye una pagina propia en el menu del plugin para buscar e importar desde TMDb.
 - Expone un endpoint que puedes integrar con tu flujo (boton personalizado, script, app externa).
 
 ## Endpoint
