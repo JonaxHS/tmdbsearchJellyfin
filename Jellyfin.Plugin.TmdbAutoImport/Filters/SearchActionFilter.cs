@@ -4,10 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
-using Jellyfin.Plugin.TmdbAutoImport.Configuration;
 using Jellyfin.Plugin.TmdbAutoImport.Services;
-using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Querying;
 using Microsoft.AspNetCore.Mvc;
@@ -19,14 +16,12 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.TmdbAutoImport.Filters;
 
 public sealed class SearchActionFilter(
-    ILibraryManager libraryManager,
     TmdbClient tmdbClient,
-    ImportService importService,
     IMemoryCache memoryCache,
     ILogger<SearchActionFilter> logger
 ) : IAsyncActionFilter, IOrderedFilter
 {
-    private static readonly TimeSpan SearchCacheTtl = TimeSpan.FromMinutes(10);
+    private const int MaxTmdbResultsPerType = 5;
 
     public int Order => 1;
 
@@ -45,19 +40,51 @@ public sealed class SearchActionFilter(
             return;
         }
 
-        var normalizedSearchTerm = NormalizeSearchTerm(searchTerm);
-        var cacheKey = BuildCacheKey(normalizedSearchTerm, requestedTypes);
+        await next();
 
-        if (memoryCache.TryGetValue(cacheKey, out QueryResult<BaseItemDto>? cachedResult) && cachedResult is not null)
+        if (!TryGetExistingQueryResult(ctx, out var existingResult))
         {
-            ctx.Result = new OkObjectResult(cachedResult);
             return;
         }
 
-        if (HasLocalMatches(searchTerm, requestedTypes))
+        var localItems = existingResult.Items?.ToList() ?? new List<BaseItemDto>();
+        var remoteItems = await GetRemoteDtosAsync(searchTerm, requestedTypes, ctx.HttpContext.RequestAborted)
+            .ConfigureAwait(false);
+
+        if (remoteItems.Count == 0)
         {
-            await next();
             return;
+        }
+
+        var merged = new List<BaseItemDto>(localItems.Count + remoteItems.Count);
+        merged.AddRange(localItems);
+        merged.AddRange(remoteItems);
+
+        existingResult.Items = merged.ToArray();
+        existingResult.TotalRecordCount += remoteItems.Count;
+
+        logger.LogInformation(
+            "TMDb Auto Import merged search \"{Query}\" local={LocalCount} tmdb={TmdbCount}",
+            searchTerm,
+            localItems.Count,
+            remoteItems.Count
+        );
+
+        ctx.Result = new OkObjectResult(existingResult);
+    }
+
+    private async Task<List<BaseItemDto>> GetRemoteDtosAsync(
+        string searchTerm,
+        HashSet<BaseItemKind> requestedTypes,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        var normalizedSearchTerm = NormalizeSearchTerm(searchTerm);
+        var typesKey = string.Join(",", requestedTypes.OrderBy(type => type).Select(type => type.ToString()));
+        var cacheKey = TmdbVirtualItemCache.BuildSearchResultCacheKey(normalizedSearchTerm, typesKey);
+
+        if (memoryCache.TryGetValue(cacheKey, out List<BaseItemDto>? cached) && cached is not null)
+        {
+            return cached;
         }
 
         try
@@ -68,73 +95,29 @@ public sealed class SearchActionFilter(
             {
                 var tmdbType = requestedType == BaseItemKind.Series ? "series" : "movie";
                 var response = await tmdbClient
-                    .SearchAsync(searchTerm, tmdbType, ctx.HttpContext.RequestAborted)
+                    .SearchAsync(searchTerm, tmdbType, cancellationToken)
                     .ConfigureAwait(false);
 
-                var top = response.Results.FirstOrDefault();
-                if (top is null)
+                var topResults = response.Results.Take(MaxTmdbResultsPerType).ToList();
+                if (topResults.Count == 0)
                 {
                     continue;
                 }
 
-                var importPath = requestedType == BaseItemKind.Series
-                    ? await importService
-                        .ImportSeriesAsync(top, ctx.HttpContext.RequestAborted)
-                        .ConfigureAwait(false)
-                    : await importService
-                        .ImportMovieAsync(top, ctx.HttpContext.RequestAborted)
-                        .ConfigureAwait(false);
-
-                remoteDtos.Add(CreateDto(top, requestedType, importPath));
+                foreach (var item in topResults)
+                {
+                    remoteDtos.Add(CreateDto(item, requestedType, memoryCache));
+                }
             }
 
-            if (remoteDtos.Count == 0)
-            {
-                await next();
-                return;
-            }
-
-            var start = GetIntArgument(ctx, "startIndex", 0);
-            var limit = GetIntArgument(ctx, "limit", 25);
-            var paged = remoteDtos.Skip(start).Take(limit).ToArray();
-
-            var result = new QueryResult<BaseItemDto>
-            {
-                Items = paged,
-                TotalRecordCount = remoteDtos.Count,
-            };
-
-            memoryCache.Set(cacheKey, result, SearchCacheTtl);
-
-            logger.LogInformation(
-                "TMDb Auto Import intercepted search \"{Query}\" types=[{Types}] results={Count}",
-                searchTerm,
-                string.Join(",", requestedTypes),
-                remoteDtos.Count
-            );
-
-            ctx.Result = new OkObjectResult(result);
+            memoryCache.Set(cacheKey, remoteDtos, TmdbVirtualItemCache.SearchResultTtl);
+            return remoteDtos;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "TMDb Auto Import search interception failed for {Query}", searchTerm);
-            await next();
+            return new List<BaseItemDto>();
         }
-    }
-
-    private bool HasLocalMatches(string searchTerm, HashSet<BaseItemKind> requestedTypes)
-    {
-        var localItems = libraryManager.GetItemList(
-            new InternalItemsQuery
-            {
-                SearchTerm = searchTerm,
-                IncludeItemTypes = requestedTypes.ToArray(),
-                Recursive = true,
-                Limit = 1,
-            }
-        );
-
-        return localItems.Count > 0;
     }
 
     private static bool IsSearchAction(ActionExecutingContext ctx)
@@ -197,18 +180,30 @@ public sealed class SearchActionFilter(
         return requested;
     }
 
-    private static BaseItemDto CreateDto(TmdbSearchItem item, BaseItemKind kind, string importPath)
+    private static BaseItemDto CreateDto(TmdbSearchItem item, BaseItemKind kind, IMemoryCache memoryCache)
     {
+        var virtualId = TmdbVirtualItemCache.BuildVirtualGuid(kind, item.Id);
+        var virtualCacheKey = TmdbVirtualItemCache.BuildVirtualItemCacheKey(virtualId);
+
+        memoryCache.Set(
+            virtualCacheKey,
+            new TmdbVirtualItem
+            {
+                Kind = kind,
+                Item = item,
+            },
+            TmdbVirtualItemCache.VirtualItemTtl
+        );
+
         var title = item.Title ?? item.Name ?? string.Empty;
         var year = TryParseYear(item.ReleaseDate ?? item.FirstAirDate);
 
         return new BaseItemDto
         {
-            Id = Guid.NewGuid(),
+            Id = virtualId,
             Name = title,
             Type = kind,
             Overview = item.Overview,
-            Path = importPath,
             ProductionYear = year,
             ProviderIds = new Dictionary<string, string>
             {
@@ -246,9 +241,20 @@ public sealed class SearchActionFilter(
         return false;
     }
 
-    private static int GetIntArgument(ActionExecutingContext ctx, string key, int defaultValue)
+    private static bool TryGetExistingQueryResult(ActionExecutingContext ctx, out QueryResult<BaseItemDto> queryResult)
     {
-        return TryGetActionArgument(ctx, key, out int value) ? value : defaultValue;
+        if (ctx.Result is OkObjectResult { Value: QueryResult<BaseItemDto> direct })
+        {
+            queryResult = direct;
+            return true;
+        }
+
+        queryResult = new QueryResult<BaseItemDto>
+        {
+            Items = Array.Empty<BaseItemDto>(),
+            TotalRecordCount = 0,
+        };
+        return false;
     }
 
     private static string NormalizeSearchTerm(string searchTerm)
@@ -256,9 +262,4 @@ public sealed class SearchActionFilter(
         return searchTerm.Trim().ToLowerInvariant();
     }
 
-    private static string BuildCacheKey(string searchTerm, HashSet<BaseItemKind> requestedTypes)
-    {
-        var typesKey = string.Join(",", requestedTypes.OrderBy(type => type).Select(type => type.ToString()));
-        return $"tmdb-auto-import-search:{searchTerm}:{typesKey}";
-    }
 }

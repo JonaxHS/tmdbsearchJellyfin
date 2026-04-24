@@ -8,6 +8,14 @@
     "overview": "Busqueda local + importacion automatica desde TMDb",
     "versions": [
       {
+        "version": "0.1.3.0",
+        "changelog": "Native Jellyfin search now merges local results with TMDb virtual results, and imports TMDb items only when they are selected.",
+        "targetAbi": "10.11.8.0",
+        "sourceUrl": "https://raw.githubusercontent.com/JonaxHS/tmdbsearchJellyfin/main/dist/10.11.8.-.tmdb-auto-import_0.1.3.0.zip",
+        "checksum": "339621356834287031905b7428ee2752",
+        "timestamp": "2026-04-24T18:02:35Z"
+      },
+      {
         "version": "0.1.2.0",
         "changelog": "Native Jellyfin search interception for /Items with TMDb fallback import, plus short result cache to avoid repeated imports while typing.",
         "targetAbi": "10.11.8.0",
