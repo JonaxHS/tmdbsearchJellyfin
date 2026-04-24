@@ -8,11 +8,11 @@
     "overview": "Busqueda local + importacion automatica desde TMDb",
     "versions": [
       {
-        "version": "0.1.0.0",
-        "changelog": "Version inicial con API de busqueda/importacion y configuracion web.",
+        "version": "0.1.1.0",
+        "changelog": "Fix: avoid plugin malfunction on startup by removing early configuration dependency in service registration.",
         "targetAbi": "10.11.8.0",
-        "sourceUrl": "https://raw.githubusercontent.com/JonaxHS/tmdbsearchJellyfin/main/dist/10.11.8.-.tmdb-auto-import_0.1.0.0.zip",
-        "checksum": "0d1c3c7dc912ab0e909137d3cff71969",
+        "sourceUrl": "https://raw.githubusercontent.com/JonaxHS/tmdbsearchJellyfin/main/dist/10.11.8.-.tmdb-auto-import_0.1.1.0.zip",
+        "checksum": "5a444b46fb2b42ebb3c4e016679a63b9",
         "timestamp": "2026-04-24T16:34:26Z"
       }
     ]
