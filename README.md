@@ -27,7 +27,9 @@ Respuesta:
 Configura estos campos en `PluginConfiguration`:
 
 - `TmdbApiKey`: API key de TMDb.
-- `ImportRootPath`: ruta raiz donde el plugin creara `Movies/` y `Series/`.
+- `MoviesImportPath`: ruta donde se importan peliculas.
+- `SeriesImportPath`: ruta donde se importan series.
+- `ImportRootPath`: ruta legacy opcional (fallback) si no defines las dos rutas separadas.
 - `Language`: idioma para TMDb (ej: `es-ES`).
 - `Country`: region para TMDb (ej: `ES`).
 - `MovieStrmUrlTemplate`: URL plantilla del `.strm`, usa `{tmdbId}`.
@@ -45,3 +47,19 @@ dotnet build Jellyfin.Plugin.TmdbAutoImport/Jellyfin.Plugin.TmdbAutoImport.cspro
 3. Reinicia Jellyfin.
 4. Configura tu API key y ruta de importacion.
 5. Ejecuta una exploracion de biblioteca para que indexe los placeholders creados.
+
+## Instalar desde repositorio en Jellyfin
+
+Este repo incluye un `manifest.json` compatible con el catalogo de Jellyfin.
+
+URL del repositorio para pegar en Jellyfin:
+
+`https://raw.githubusercontent.com/JonaxHS/tmdbsearchJellyfin/main/manifest.json`
+
+Pasos:
+
+1. Dashboard -> Catalogo de plugins.
+2. Repositorios -> Agregar.
+3. Pega la URL anterior.
+4. Guarda y recarga el catalogo.
+5. Instala **TMDb Auto Import** desde la categoria General.

@@ -1,0 +1,20 @@
+[
+  {
+    "category": "General",
+    "guid": "9d4fb3ad-76c7-4eb4-b17a-ec6fbc7ab637",
+    "name": "TMDb Auto Import",
+    "description": "Busca en biblioteca local y, si no existe, importa placeholder desde TMDb.",
+    "owner": "JonaxHS",
+    "overview": "Busqueda local + importacion automatica desde TMDb",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Version inicial con API de busqueda/importacion y configuracion web.",
+        "targetAbi": "10.11.8.0",
+        "sourceUrl": "https://raw.githubusercontent.com/JonaxHS/tmdbsearchJellyfin/main/dist/10.11.8.-.tmdb-auto-import_0.1.0.0.zip",
+        "checksum": "0d1c3c7dc912ab0e909137d3cff71969",
+        "timestamp": "2026-04-24T16:34:26Z"
+      }
+    ]
+  }
+]

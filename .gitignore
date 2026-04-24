@@ -1,0 +1,6 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# OS
+.DS_Store
