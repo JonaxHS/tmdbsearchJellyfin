@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>TMDb Auto Import</title>
+</head>
+<body>
+    <div id="TmdbAutoImportConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="TmdbAutoImportConfigForm">
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDb API Key</label>
+                        <input id="TmdbApiKey" name="TmdbApiKey" type="text" autocomplete="off" />
+                        <div class="fieldDescription">Clave API de TMDb usada para buscar peliculas y series.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="Language">Idioma de importacion</label>
+                        <input id="Language" name="Language" type="text" placeholder="es-ES" autocomplete="off" />
+                        <div class="fieldDescription">Formato recomendado: es-ES, en-US, pt-BR, etc.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="MoviesImportPath">Ruta de importacion de peliculas</label>
+                        <input id="MoviesImportPath" name="MoviesImportPath" type="text" placeholder="/ruta/a/peliculas" autocomplete="off" />
+                        <div class="fieldDescription">Carpeta donde se crearan los archivos de peliculas importadas.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SeriesImportPath">Ruta de importacion de series</label>
+                        <input id="SeriesImportPath" name="SeriesImportPath" type="text" placeholder="/ruta/a/series" autocomplete="off" />
+                        <div class="fieldDescription">Carpeta donde se crearan los archivos de series importadas.</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Guardar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '9d4fb3ad-76c7-4eb4-b17a-ec6fbc7ab637';
+
+                function onPageShow() {
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        document.querySelector('#TmdbApiKey').value = config.TmdbApiKey || '';
+                        document.querySelector('#Language').value = config.Language || 'es-ES';
+                        document.querySelector('#MoviesImportPath').value = config.MoviesImportPath || '';
+                        document.querySelector('#SeriesImportPath').value = config.SeriesImportPath || '';
+                        Dashboard.hideLoadingMsg();
+                    });
+                }
+
+                function onFormSubmit(e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.TmdbApiKey = document.querySelector('#TmdbApiKey').value || '';
+                        config.Language = document.querySelector('#Language').value || 'es-ES';
+                        config.MoviesImportPath = document.querySelector('#MoviesImportPath').value || '';
+                        config.SeriesImportPath = document.querySelector('#SeriesImportPath').value || '';
+
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
+                            Dashboard.processPluginConfigurationUpdateResult();
+                        });
+                    });
+
+                    return false;
+                }
+
+                var page = document.querySelector('#TmdbAutoImportConfigPage');
+                page.addEventListener('pageshow', onPageShow);
+                document.querySelector('#TmdbAutoImportConfigForm').addEventListener('submit', onFormSubmit);
+            })();
+        </script>
+    </div>
+</body>
+</html>
